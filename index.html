@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kangel Quiz</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            color: white;
+            font-family: 'Courier New', Courier, monospace; /* Fuente estilo retro/digital */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        #game-container {
+            width: 90%;
+            max-width: 400px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .option-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        .option-btn:hover {
+            background: white;
+            color: black;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        /* Pantalla de Perder */
+        #lose-screen {
+            display: none;
+        }
+
+        .futuristic-x {
+            font-size: 5rem;
+            background: none;
+            border: none;
+            color: #ff0055;
+            cursor: pointer;
+            text-shadow: 0 0 10px #ff0055, 0 0 20px #ff0055, 0 0 40px red;
+            transition: transform 0.2s;
+            animation: pulse 1.5s infinite;
+        }
+
+        .futuristic-x:hover {
+            transform: scale(1.1) rotate(90deg);
+        }
+
+        .retry-text {
+            display: block;
+            margin-top: 10px;
+            color: #ff0055;
+            letter-spacing: 3px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.8; text-shadow: 0 0 10px #ff0055; }
+            50% { opacity: 1; text-shadow: 0 0 30px #ff0055, 0 0 50px red; }
+            100% { opacity: 0.8; text-shadow: 0 0 10px #ff0055; }
+        }
+
+        /* Canvas para Confeti */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="confetti-canvas"></canvas>
+
+    <div id="game-container">
+        <div id="quiz-box">
+            <h1 id="question-text">Pregunta aquí</h1>
+            <div id="options-container">
+                </div>
+        </div>
+
+        <div id="lose-screen">
+            <h2 style="color: #ff0055;">GAME OVER</h2>
+            <button class="futuristic-x" onclick="restartGame()">X</button>
+            <span class="retry-text">REINTENTAR</span>
+        </div>
+
+        <div id="win-screen" style="display: none;">
+            <h1 style="text-shadow: 0 0 10px #fff;">¡BLESS!</h1>
+            <p>Has llegado al final verdadero.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN DEL QUIZ ---
+        const questions = [
+            {
+                question: "¿Amas a Kangel?",
+                answers: [
+                    { text: "Si", next: true },
+                    { text: "No", next: false }
+                ]
+            },
+            {
+                question: "¿Te consideras femcel?",
+                answers: [
+                    { text: "Si soy femcel", next: true },
+                    { text: "No soy incel", next: false }
+                ]
+            },
+            {
+                question: "¿Andarías con el ángel?",
+                answers: [
+                    { text: "Si", next: 'win' },
+                    { text: "Si", next: 'win' } // Ambas opciones ganan
+                ]
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+
+        const quizBox = document.getElementById('quiz-box');
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const loseScreen = document.getElementById('lose-screen');
+        const winScreen = document.getElementById('win-screen');
+
+        // Función para cargar la pregunta
+        function loadQuestion() {
+            // Limpiar opciones anteriores
+            optionsContainer.innerHTML = '';
+            
+            const currentQ = questions[currentQuestionIndex];
+            questionText.textContent = currentQ.question;
+
+            currentQ.answers.forEach(answer => {
+                const btn = document.createElement('button');
+                btn.textContent = answer.text;
+                btn.classList.add('option-btn');
+                btn.onclick = () => handleAnswer(answer.next);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        // Manejar la respuesta
+        function handleAnswer(outcome) {
+            if (outcome === true) {
+                // Siguiente pregunta
+                currentQuestionIndex++;
+                if (currentQuestionIndex < questions.length) {
+                    loadQuestion();
+                }
+            } else if (outcome === false) {
+                // Perder
+                quizBox.style.display = 'none';
+                loseScreen.style.display = 'block';
+            } else if (outcome === 'win') {
+                // Ganar
+                quizBox.style.display = 'none';
+                winScreen.style.display = 'block';
+                startConfetti();
+            }
+        }
+
+        // Reiniciar juego
+        function restartGame() {
+            currentQuestionIndex = 0;
+            loseScreen.style.display = 'none';
+            winScreen.style.display = 'none';
+            quizBox.style.display = 'block';
+            stopConfetti();
+            loadQuestion();
+        }
+
+        // Iniciar
+        loadQuestion();
+
+        // --- SISTEMA DE CONFETI ---
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+        let confettiInterval;
+        let particles = [];
+        
+        // Colores Pastel
+        const colors = ['#FFB7B2', '#B5EAD7', '#E2F0CB', '#FFDAC1', '#E0BBE4', '#957DAD'];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function createParticle() {
+            return {
+                x: Math.random() * canvas.width,
+                y: -10,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                size: Math.random() * 7 + 3,
+                speedY: Math.random() * 3 + 2,
+                speedX: Math.random() * 2 - 1,
+                wobble: Math.random() * Math.PI * 2,
+                wobbleSpeed: 0.1
+            };
+        }
+
+        function updateConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Añadir nuevas partículas
+            if (particles.length < 150) {
+                particles.push(createParticle());
+            }
+
+            particles.forEach((p, index) => {
+                p.y += p.speedY;
+                p.x += Math.sin(p.wobble) * 2;
+                p.wobble += p.wobbleSpeed;
+
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eliminar si sale de la pantalla
+                if (p.y > canvas.height) {
+                    particles[index] = createParticle();
+                }
+            });
+        }
+
+        function startConfetti() {
+            if (!confettiInterval) {
+                confettiInterval = setInterval(updateConfetti, 20);
+            }
+        }
+
+        function stopConfetti() {
+            clearInterval(confettiInterval);
+            confettiInterval = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles = [];
+        }
+    </script>
+</body>
+  </html>
+  
